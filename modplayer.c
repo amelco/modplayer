@@ -10,10 +10,22 @@
 #define panic(x,msg) if (x == -1) { printf("ERROR: %s\n", msg); return 1; }
 #define h_addr h_addr_list[0]
 
-int main(void)
+bool verbose = false;
+
+int main(int argc, char** argv)
 {
+    (void)argc;
+    (void)argv;
+    // TODO:
+    // - args: -v verbose mode  (default: false)
+    //         -d [path] path of directory to store downloaded mod files (default: same as executable)
+
     srand(time(NULL));
     int modNumber = rand() % 80000;
+
+    // TODO:
+    // - verify if modNumber exists in data file and has status 0 (valid mod file)
+
     char* url = "api.modarchive.org";
     char message[256] = {'\0'};
     sprintf(message, "GET /downloads.php?moduleid=%d HTTP/1.1\r\nHOST: api.modarchive.org\r\nConnection: close\r\n\r\n", modNumber);
@@ -24,9 +36,10 @@ int main(void)
 
     struct hostent* host = gethostbyname(url);
     struct sockaddr_in addr = {
-        AF_INET,
-        htons(80),
-        *(struct in_addr*)host->h_addr
+        .sin_family = AF_INET,
+        .sin_port = htons(80),
+        .sin_addr = *(struct in_addr*)host->h_addr,
+        .sin_zero = {0}
     };
     printf("Connecting to %s ... ", host->h_name);
     int res = connect(socketfd, (struct sockaddr*)&addr, sizeof(addr));
@@ -50,23 +63,32 @@ int main(void)
 
     // remove http header from response
     bool found = false;
-    size_t index = 0;
-    const char end[5] = {0x0d,0x0a,0x0d,0x0a,'\0'};   // 2 times \r\n
-    while (!found && index < responseSize)
+    size_t beginBinary = 0;
+    const char endHeader[5] = {0x0d,0x0a,0x0d,0x0a,'\0'};   // 2 times \r\n
+    while (!found && beginBinary < responseSize)
     {
         char word[5] = {'\0'};
-        memcpy(&word[0], &response[index], 4);
-        if (strcmp(word, end) == 0) 
+        memcpy(&word[0], &response[beginBinary], 4);
+        if (strcmp(word, endHeader) == 0) 
         {
             found = true;
-            index += 3; // points right to the beggining of binary data
+            beginBinary += 3;
         }
-        index += 1;
+        beginBinary += 1;
     }
 
+    // TODO:
+    // - verify if file is of type mod
+    // - if not, regenerate new number and download new file.
+    // - store number and status of file in a data file
+    //   - status: 0 - valid mod file
+    //             1 - invalid mod file
+
     // save mod bin file
-    FILE* modFile = fopen("test.mod", "wb");
-    fwrite(&response[index], 1, responseSize, modFile);
+    char filename[256] = {'\0'};
+    sprintf(filename, "%d.mod", modNumber);
+    FILE* modFile = fopen(filename, "wb");
+    fwrite(&response[beginBinary], 1, responseSize, modFile);
     fclose(modFile);
 
     return 0;
