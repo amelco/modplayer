@@ -18,7 +18,8 @@ int main(int argc, char** argv)
     (void)argv;
     // TODO:
     // - args: -v verbose mode  (default: false)
-    //         -d [path] path of directory to store downloaded mod files (default: same as executable)
+    //         -p [path] path of directory to store downloaded mod files (default: same as executable)
+    //         -d download new random musics (default: true)
 
     srand(time(NULL));
     int modNumber = rand() % 80000;
@@ -91,5 +92,21 @@ int main(int argc, char** argv)
     fwrite(&response[beginBinary], 1, responseSize, modFile);
     fclose(modFile);
 
+    char cmd[4 + 256] = {'\0'}; 
+    sprintf(cmd, "xmp %s", filename);
+    FILE* fo = popen(cmd, "r");
+    if (fo == NULL) 
+    {
+        printf("ERROR: could not open mod file '%s'\n", filename);
+        return 1;
+    }
+
+    char buff[256];
+    while (fgets(buff, sizeof(buff)-1, fo) != NULL) 
+    {
+        printf("%s", buff);
+    }
+
+    printf("\nBye!\n");
     return 0;
 }
