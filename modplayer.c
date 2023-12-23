@@ -1,14 +1,14 @@
 #include <stdio.h>
-#include <sys/socket.h>
-#include <netdb.h>
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
 #include <stdbool.h>
-#include <errno.h>
 #include <xmp.h>
+#include <errno.h>
 
-#define BUFFER_SIZE 1024*1024  // 1Kb
+#define HTTP_IMPLEMENTATION
+#include "http.h"
+
 #define panic(x,msg) if (x == -1) { printf("ERROR: %s\n", msg); return 1; }
 #define h_addr h_addr_list[0]
 
@@ -53,40 +53,11 @@ int main(int argc, char** argv)
     // TODO:
     // - verify if modNumber exists in data file and has status 0 (valid mod file)
 
-    char* url = "api.modarchive.org";
-    char message[256] = {'\0'};
-    sprintf(message, "GET /downloads.php?moduleid=%d HTTP/1.1\r\nHOST: api.modarchive.org\r\nConnection: close\r\n\r\n", modNumber);
-    //sprintf(message, "GET /downloads.php?moduleid=47679 HTTP/1.1\r\nHOST: api.modarchive.org\r\nConnection: close\r\n\r\n");
-
-    int socketfd = socket(AF_INET, SOCK_STREAM, 0);
-    panic(socketfd, "Could not create socket");
-
-    struct hostent* host = gethostbyname(url);
-    struct sockaddr_in addr = {
-        .sin_family = AF_INET,
-        .sin_port = htons(80),
-        .sin_addr = *(struct in_addr*)host->h_addr,
-        .sin_zero = {0}
-    };
-    printf("Connecting to %s ... ", host->h_name);
-    int res = connect(socketfd, (struct sockaddr*)&addr, sizeof(addr));
-    panic(res,"Could not connect");
-    printf("connected to server\n");
-
-    res = send(socketfd, message, strlen(message), 0);
-    panic(res,"Could send data request");
-    printf("Done!\n %s\n", message);
-
-    unsigned char buffer[BUFFER_SIZE];
-    unsigned char response[BUFFER_SIZE];
-    int numBytes = 0;
+    Config cfg = http_config("api.modarchive.org", 80);
     size_t responseSize = 0;
-    while ((numBytes = recv(socketfd, buffer, BUFFER_SIZE-1, 0)) > 0)
-    {
-        memcpy(&response[responseSize], &buffer[0], numBytes);
-        responseSize += numBytes;
-        panic(numBytes,"Could get response from server");
-    }
+    char endpoint[100] = {'\0'};
+    sprintf(endpoint, "/downloads.php?moduleid=%d", modNumber);
+    unsigned char* response = http_get(endpoint, cfg, &responseSize);
 
     // remove http header from response
     bool found = false;
@@ -153,7 +124,6 @@ int main(int argc, char** argv)
         printf("ERROR: could not open mod file '%s'\n", filename);
         return 1;
     }
-    printf("ERRNO VALUE: %d\n", errno);
     if (errno != 0)
     {
         printf("ERROR: %s", strerror(errno));
