@@ -7,7 +7,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
-#define BUFFER_SIZE 1024*1024  // 1Kb
+#define BUFFER_SIZE 1024*1024  // 1 MB
 
 typedef struct {
     int socketfd;
@@ -51,7 +51,7 @@ unsigned char* http_get(char* endpoint, Config cfg, size_t* responseSize)
     assert(res != -1);
 
     unsigned char buffer[BUFFER_SIZE];
-    static unsigned char response[BUFFER_SIZE];
+    static unsigned char response[BUFFER_SIZE*5]; // 5 MB
     int numBytes = 0;
     *responseSize = 0;
     while ((numBytes = recv(cfg.socketfd, buffer, BUFFER_SIZE-1, 0)) > 0)
@@ -60,6 +60,7 @@ unsigned char* http_get(char* endpoint, Config cfg, size_t* responseSize)
         *responseSize += numBytes;
         assert(numBytes != -1);
     }
+
     return &response[0];
 }
 
