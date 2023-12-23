@@ -10,13 +10,14 @@
 #define HTTP_IMPLEMENTATION
 #include "http.h"
 
+#define clearscreen() printf("\033[H\033[J")
 
 bool verbose = false;
 
-char* save(int modNumber, unsigned char* modFileContent, size_t responseSize)
+char* save(char* absDirectory, int modNumber, unsigned char* modFileContent, size_t responseSize)
 {
     static char filename[100] = {'\0'};
-    sprintf(filename, "%d.mod", modNumber);
+    sprintf(filename, "%s/%d.mod", absDirectory, modNumber);
     FILE* modFile = fopen(filename, "wb");
     fwrite(modFileContent, 1, responseSize, modFile);
     fclose(modFile);
@@ -63,65 +64,70 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    bool accepted = false;
-    int modNumber = 0;
-    size_t responseSize = 0;
-    unsigned char* modFileContent;
-    while (!accepted)
+    for(;;)
     {
-        srand(time(NULL));
-        modNumber = rand() % 90000;
-
-        // TODO:
-        // - verify if modNumber exists in data file and has status 0 (valid mod file)
-
-        Config cfg = http_config("api.modarchive.org", 80);
-        char endpoint[100] = {'\0'};
-        sprintf(endpoint, "/downloads.php?moduleid=%d", modNumber);
-        unsigned char* response = http_get(endpoint, cfg, &responseSize);
-
-        // remove http header from response
-        bool found = false;
-        size_t beginBinary = 0;
-        const char endHeader[5] = {0x0d,0x0a,0x0d,0x0a,'\0'};   // 2 times \r\n
-        while (!found && beginBinary < responseSize)
+        clearscreen();
+        printf("#### CTRL+C to exit ####\n\n");
+        bool accepted = false;
+        int modNumber = 0;
+        size_t responseSize = 0;
+        unsigned char* modFileContent;
+        while (!accepted)
         {
-            char word[5] = {'\0'};
-            memcpy(&word[0], &response[beginBinary], 4);
-            if (strcmp(word, endHeader) == 0) 
+            srand(time(NULL));
+            modNumber = rand() % 90000;
+
+            // TODO:
+            // - verify if modNumber exists in data file and has status 0 (valid mod file)
+
+            Config cfg = http_config("api.modarchive.org", 80);
+            char endpoint[100] = {'\0'};
+            sprintf(endpoint, "/downloads.php?moduleid=%d", modNumber);
+            unsigned char* response = http_get(endpoint, cfg, &responseSize);
+
+            // remove http header from response
+            bool found = false;
+            size_t beginBinary = 0;
+            const char endHeader[5] = {0x0d,0x0a,0x0d,0x0a,'\0'};   // 2 times \r\n
+            while (!found && beginBinary < responseSize)
             {
-                found = true;
-                beginBinary += 3;
+                char word[5] = {'\0'};
+                memcpy(&word[0], &response[beginBinary], 4);
+                if (strcmp(word, endHeader) == 0) 
+                {
+                    found = true;
+                    beginBinary += 3;
+                }
+                beginBinary += 1;
             }
-            beginBinary += 1;
-        }
-        unsigned char* binContent = &response[beginBinary];
+            unsigned char* binContent = &response[beginBinary];
 
-        if (responseSize <= 427)
-        {
-            printf("Music non-existent in the website.\nDownloading a new one...\n\n");
-            sleep(1);
-            continue;
+            if (responseSize <= 427)
+            {
+                printf("Music non-existent in the website.\nDownloading a new one...\n\n");
+                sleep(1);
+                continue;
+            }
+
+            // accept AMIGA, IMPM and Extendend Module mod files
+            accepted = (
+                   is_accepted_header("M.K.", 4, binContent, 0x438)
+                || is_accepted_header("IMPM", 4, binContent, 0)
+                || is_accepted_header("Extended Module:", 16, binContent, 0)
+            );
+
+            if (!accepted)
+            {
+                printf("Non-accepted type of mod file (%d.mod).\nDownloading a new one...\n\n", modNumber);
+                sleep(1);
+                continue;
+            }
+            modFileContent = binContent;
         }
 
-        // accept AMIGA, IMPM and Extendend Module mod files
-        accepted = (
-               is_accepted_header("M.K.", 4, binContent, 0x438)
-            || is_accepted_header("IMPM", 4, binContent, 0)
-            || is_accepted_header("Extended Module:", 16, binContent, 0)
-        );
-
-        if (!accepted)
-        {
-            printf("Non-accepted type of mod file (%d.mod).\nDownloading a new one...\n\n", modNumber);
-            sleep(1);
-            continue;
-        }
-        modFileContent = binContent;
+        char* filename = save("/home/andreb/mods", modNumber, modFileContent, responseSize);
+        play(filename);
     }
-
-    char* filename = save(modNumber, modFileContent, responseSize);
-    play(filename);
 
     printf("\nBye!\n");
     return 0;
