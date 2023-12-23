@@ -51,7 +51,11 @@ int play(char* filename)
 
 bool is_accepted_header(char* expectedHeaderValue, int size, unsigned char* bytes, int startIndex)
 {
-    if (memcmp(bytes + startIndex, expectedHeaderValue, size) == 0) return true;
+    if (memcmp(bytes + startIndex, expectedHeaderValue, size) == 0)
+    {
+        printf("MOD type: %s\n", expectedHeaderValue);
+        return true;
+    }
     return false;
 }
 
@@ -111,9 +115,9 @@ int main(int argc, char** argv)
 
             // accept AMIGA, IMPM and Extendend Module mod files
             accepted = (
-                   is_accepted_header("M.K.", 4, binContent, 0x438)
-                || is_accepted_header("IMPM", 4, binContent, 0)
+                   is_accepted_header("IMPM", 4, binContent, 0)
                 || is_accepted_header("Extended Module:", 16, binContent, 0)
+                || is_accepted_header("M.K.", 4, binContent, 0x438)
             );
 
             if (!accepted)
