@@ -129,7 +129,6 @@ int main(int argc, char** argv)
                     play(filePath);
                 }
             }
-            strcpy(fileList[num_files++], strModNumber);    // stores even an invalid mod so it would not be downloaded again in the future
             if (playedLocal)
                 continue;
             
